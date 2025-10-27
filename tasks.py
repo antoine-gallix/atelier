@@ -75,6 +75,32 @@ class CopyFileIn(Command):
         return ["scp", source, f"{self.host}:{self.dest}"]
 
 
+@dataclass
+class DockerComposeUp(Command):
+    file: str
+
+    @property
+    def describe(self):
+        return f"start docker composition from file {self.file}"
+
+    def elements(self):
+        file = Path(self.file).expanduser()
+        return ["docker", "compose", "--file", file, "up", "--detach"]
+
+
+@dataclass
+class DockerComposeDown(Command):
+    file: str
+
+    @property
+    def describe(self):
+        return f"terminate docker composition from file {self.file}"
+
+    def elements(self):
+        file = Path(self.file).expanduser()
+        return ["docker", "compose", "--file", file, "down"]
+
+
 @task
 def copy(ctx):
     """Copy files on the server"""
@@ -92,3 +118,17 @@ def copy(ctx):
         for command in commands:
             print(command.describe)
             ctx.run(str(command), echo=True)
+
+
+@task
+def terminate(ctx):
+    """Terminate server"""
+    command = ExecuteOnHost(config.server, DockerComposeDown(config.compose))
+    ctx.run(str(command))
+
+
+@task
+def start(ctx):
+    """Start server"""
+    command = ExecuteOnHost(config.server, DockerComposeUp(config.compose))
+    ctx.run(str(command))
