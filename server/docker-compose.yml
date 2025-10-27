@@ -6,8 +6,14 @@ services:
     ports:
       - "80:80"
     volumes:
+        # content to be served
         - type: bind
           source: ~/html
           target: /usr/share/nginx/html
+          read_only: true
+        # server configurations
+        - type: bind
+          source: ~/nginx
+          target: /etc/nginx/conf.d
           read_only: true
 
