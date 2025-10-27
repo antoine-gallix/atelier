@@ -7,7 +7,7 @@ services:
       - "80:80"
     volumes:
         - type: bind
-          source: ./html
+          source: ~/html
           target: /usr/share/nginx/html
           read_only: true
 
