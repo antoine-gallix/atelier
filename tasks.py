@@ -7,18 +7,13 @@ import config
 
 @task
 def copy(ctx):
+    """Copy files on the server"""
     print("copy files to the server")
     for source, dest in config.content:
         print(f"{source} -> {dest}")
-        recursive = None
+        recursive = ""
         source = Path(source).expanduser()
         if source.exists() and source.is_dir():
             source = f"{source}/*"
-        command_elements = ["scp", recursive, source, f"{config.server}:{dest}"]
-        command = " ".join(
-            map(
-                str,
-                filter(None, command_elements),
-            )
-        )
+        command = " ".join(["scp", recursive, source, f"{config.server}:{dest}"])
         ctx.run(command, echo=True)
