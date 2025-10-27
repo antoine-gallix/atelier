@@ -1,0 +1,13 @@
+services:
+  server:
+    image: nginx
+    container_name: nginx-resume-server
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+        - type: bind
+          source: ./html
+          target: /usr/share/nginx/html
+          read_only: true
+
