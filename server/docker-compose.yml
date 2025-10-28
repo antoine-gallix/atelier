@@ -16,4 +16,8 @@ services:
           source: ~/nginx
           target: /etc/nginx/conf.d
           read_only: true
-
+        # certificates
+        - type: bind
+          source: /etc/letsencrypt/live/
+          target: /etc/letsencrypt/live/
+          read_only: true
