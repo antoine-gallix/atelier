@@ -14,8 +14,6 @@ import config
 
 @dataclass
 class Command:
-    sudo: bool = field(default=False, kw_only=True)
-
     @abstractmethod
     def elements(self) -> Iterable[str | None | Path]: ...
 
@@ -23,17 +21,23 @@ class Command:
     @abstractmethod
     def describe(self) -> str | Text: ...
 
-    def prefix(self) -> list[str]:
-        if self.sudo:
-            return ["sudo"]
-        else:
-            return []
-
     def __str__(self):
-        return " ".join(map(str, filter(None, chain(self.prefix(), self.elements()))))
+        return " ".join(map(str, filter(None, self.elements())))
 
 
 styles = defaultdict(lambda: "", {"path": "blue", "host": "green"})
+
+
+@dataclass
+class Sudo(Command):
+    command: Command
+
+    @property
+    def describe(self) -> str | Text:
+        return Text.assemble("Execute as Super User: " + str(self.command))
+
+    def elements(self) -> Iterable[str | None | Path]:
+        return chain(["sudo"], self.command.elements())
 
 
 @dataclass
@@ -69,7 +73,33 @@ class ExecuteOnHost(Command):
 
 
 @dataclass
-class CopyDirectoryAs(Command):
+class CopyFileIn(Command):
+    source: str | Path
+    host: str
+    dest: str | Path
+
+    @property
+    def describe(self):
+        return Text.assemble(
+            "copy file ",
+            (str(self.source), styles["path"]),
+            " on host ",
+            (self.host, styles["host"]),
+            " in ",
+            (str(self.dest), styles["path"]),
+        )
+
+    def elements(self):
+        source = Path(self.source).expanduser()
+        return [
+            "scp",
+            source,
+            f"{self.host}:{self.dest}",
+        ]
+
+
+@dataclass
+class CopyDirIn(Command):
     source: str | Path
     host: str
     dest: str | Path
@@ -81,25 +111,31 @@ class CopyDirectoryAs(Command):
             (str(self.source), styles["path"]),
             " on ",
             (self.host, styles["host"]),
-            " as ",
+            " in ",
             (str(self.dest), styles["path"]),
         )
 
     def elements(self):
-        source_dir = Path(self.source).expanduser()
-        return ["scp", "-r", source_dir, f"{self.host}:{self.dest}"]
+        source = Path(self.source).expanduser()
+        return [
+            "scp",
+            "-r",
+            source,
+            f"{self.host}:{self.dest}",
+        ]
 
 
 @dataclass
-class CopyFileIn(Command):
+class CopyDirContentIn(Command):
     source: str | Path
     host: str
     dest: str | Path
+    content: bool = field(default=False)
 
     @property
     def describe(self):
         return Text.assemble(
-            "copy file ",
+            "copy content of dir ",
             (str(self.source), styles["path"]),
             " on ",
             (self.host, styles["host"]),
@@ -109,7 +145,12 @@ class CopyFileIn(Command):
 
     def elements(self):
         source = Path(self.source).expanduser()
-        return ["scp", source, f"{self.host}:{self.dest}"]
+        return [
+            "scp",
+            "-r",
+            str(source / "*"),
+            f"{self.host}:{self.dest}",
+        ]
 
 
 @dataclass
@@ -150,21 +191,20 @@ def run_command(ctx, command):
 @task
 def copy(ctx):
     """Copy files on the server"""
-    for source, mode, dest in config.content:
+    for type_, source, dest in config.copy:
         dest = Path(dest)
-        match mode:
-            case "in":
-                commands = [
-                    ExecuteOnHost(config.server, EnsureDirectoryExists(dest)),
-                    CopyFileIn(source, config.server, dest),
-                ]
-            case "as":
-                commands = [
-                    ExecuteOnHost(config.server, EnsureDirectoryExists(dest.parent)),
-                    CopyDirectoryAs(source, config.server, dest),
-                ]
+        commands = [
+            ExecuteOnHost(config.server, EnsureDirectoryExists(dest)),
+        ]
+        match type_:
+            case "file":
+                commands.append(CopyFileIn(source, config.server, dest))
+            case "dir":
+                commands.append(CopyDirIn(source, config.server, dest))
+            case "content":
+                commands.append(CopyDirContentIn(source, config.server, dest))
             case _:
-                raise RuntimeError(f"unknown mode: {mode}")
+                raise RuntimeError
         for command in commands:
             run_command(ctx, command)
 
