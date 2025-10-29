@@ -34,7 +34,7 @@ class Sudo(Command):
 
     @property
     def describe(self) -> str | Text:
-        return Text.assemble("Execute as Super User: " + str(self.command))
+        return Text.assemble("Execute as Super User: ", self.command.describe)
 
     def elements(self) -> Iterable[str | None | Path]:
         return chain(["sudo"], self.command.elements())
@@ -73,7 +73,7 @@ class ExecuteOnHost(Command):
 
 
 @dataclass
-class CopyFileIn(Command):
+class CopyFileToRemote(Command):
     source: str | Path
     host: str
     dest: str | Path
@@ -99,7 +99,7 @@ class CopyFileIn(Command):
 
 
 @dataclass
-class CopyDirIn(Command):
+class CopyDirToRemote(Command):
     source: str | Path
     host: str
     dest: str | Path
@@ -126,11 +126,10 @@ class CopyDirIn(Command):
 
 
 @dataclass
-class CopyDirContentIn(Command):
+class CopyDirContentToRemote(Command):
     source: str | Path
     host: str
     dest: str | Path
-    content: bool = field(default=False)
 
     @property
     def describe(self):
@@ -150,6 +149,30 @@ class CopyDirContentIn(Command):
             "-r",
             str(source / "*"),
             f"{self.host}:{self.dest}",
+        ]
+
+
+@dataclass
+class CopyDirContent(Command):
+    source: str | Path
+    dest: str | Path
+
+    @property
+    def describe(self):
+        return Text.assemble(
+            "copy content of dir ",
+            (str(self.source), styles["path"]),
+            " in ",
+            (str(self.dest), styles["path"]),
+        )
+
+    def elements(self):
+        source = Path(self.source).expanduser()
+        return [
+            "cp",
+            "-r",
+            str(source / "*"),
+            self.dest,
         ]
 
 
@@ -188,25 +211,36 @@ def run_command(ctx, command):
     ctx.run(str(command), echo=True)
 
 
+def copy_command_from_config(type_, source, dest):
+    match type_:
+        case "file":
+            return CopyFileToRemote(source, config.server, dest)
+        case "dir":
+            return CopyDirToRemote(source, config.server, dest)
+        case "content":
+            return CopyDirContentToRemote(source, config.server, dest)
+        case _:
+            raise RuntimeError
+
+
 @task
 def copy(ctx):
     """Copy files on the server"""
+    commands = []
     for type_, source, dest in config.copy:
         dest = Path(dest)
-        commands = [
-            ExecuteOnHost(config.server, EnsureDirectoryExists(dest)),
-        ]
-        match type_:
-            case "file":
-                commands.append(CopyFileIn(source, config.server, dest))
-            case "dir":
-                commands.append(CopyDirIn(source, config.server, dest))
-            case "content":
-                commands.append(CopyDirContentIn(source, config.server, dest))
-            case _:
-                raise RuntimeError
-        for command in commands:
-            run_command(ctx, command)
+        commands.extend(
+            [
+                ExecuteOnHost(config.server, EnsureDirectoryExists(dest)),
+                copy_command_from_config(type_, source, dest),
+            ]
+        )
+    for type_, source, dest in config.copy_remote:
+        commands.append(
+            ExecuteOnHost(config.server, Sudo(CopyDirContent(source, dest)))
+        )
+    for command in commands:
+        run_command(ctx, command)
 
 
 # @task
