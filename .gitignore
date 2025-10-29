@@ -1,2 +1,4 @@
 config.py
 *.code-workspace
+dev.py
+*.pyc
