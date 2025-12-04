@@ -12,6 +12,7 @@ from commands import (
     EnsureDirectoryExists,
     ExecuteOnHost,
     NginxReload,
+    RemoveDirContent,
     Sudo,
 )
 
@@ -28,11 +29,17 @@ def update_content(ctx):
         ExecuteOnHost(
             config.REMOTE, EnsureDirectoryExists(config.CONTENT_REMOTE_TEMP_DIR)
         ),
+        ExecuteOnHost(
+            config.REMOTE, RemoveDirContent(config.CONTENT_REMOTE_TEMP_DIR)
+        ),
         CopyDirContentToRemote(
             config.CONTENT_LOCAL_DIR, config.REMOTE, config.CONTENT_REMOTE_TEMP_DIR
         ),
         ExecuteOnHost(
             config.REMOTE, Sudo(EnsureDirectoryExists(config.CONTENT_REMOTE_FINAL_DIR))
+        ),
+        ExecuteOnHost(
+            config.REMOTE, Sudo(RemoveDirContent(config.CONTENT_REMOTE_FINAL_DIR))
         ),
         ExecuteOnHost(
             config.REMOTE,

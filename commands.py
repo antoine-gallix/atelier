@@ -67,6 +67,19 @@ class ExecuteOnHost(Command):
     def elements(self):
         return ["ssh", self.host, f"'{self.command}'"]
 
+@dataclass
+class RemoveDirContent(Command):
+    directory: str | Path
+
+    @property
+    def describe(self):
+        return Text.assemble(
+            "Remove content of directory ",
+            (str(self.directory), styles["path"])
+        )
+
+    def elements(self):
+        return ["rm -rf", f"{self.directory}/*"]
 
 @dataclass
 class CopyFileToRemote(Command):
