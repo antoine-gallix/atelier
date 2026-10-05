@@ -1,0 +1,40 @@
+- name: Setup atelier
+  hosts: atelier
+  become: true
+  vars:
+    # paths relative to the home directory
+    config_paths:
+      - ~/.config/ripgrep/ripgreprc
+  tasks:
+    - name: Install cli tools
+      tags: packages
+      ansible.builtin.dnf:
+        name:
+          - fish
+          - bat
+          - tree
+          - ripgrep
+          - rsync
+        state: present
+
+    - name: Sync fish config
+      tags: config
+      become: false
+      ansible.posix.synchronize:
+        src: ~/.config/fish/
+        dest: .config/fish/
+        delete: true
+        rsync_opts:
+          - --mkpath
+          - --exclude=fish_variables
+
+    - name: Sync config files
+      tags: config
+      become: false
+      ansible.posix.synchronize:
+        src: "{{ item }}"
+        dest: "{{ item | dirname | default('.', true) }}/"
+        delete: true
+        rsync_opts:
+          - --mkpath
+      loop: "{{ config_paths }}"
