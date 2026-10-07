@@ -1,0 +1,6 @@
+resume.antoine-gallix.me {
+	root * /srv/www/resume
+	file_server {
+		index resume.html
+	}
+}

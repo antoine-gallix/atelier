@@ -1,0 +1,37 @@
+- name: Setup caddy
+  hosts: atelier
+  become: true
+  tasks:
+    - name: Install caddy
+      ansible.builtin.dnf:
+        name: caddy
+        state: present
+
+    - name: Create web root
+      ansible.builtin.file:
+        path: /srv/www
+        state: directory
+        owner: fedora
+        group: fedora
+        mode: u=rwX,go=rX
+        recurse: true
+
+    - name: Install redirect config
+      ansible.builtin.copy:
+        src: redirect.caddyfile
+        dest: /etc/caddy/Caddyfile.d/redirect.caddyfile
+        mode: "0644"
+        validate: caddy validate --adapter caddyfile --config %s
+      notify: Reload caddy
+
+    - name: Enable caddy service
+      ansible.builtin.systemd_service:
+        name: caddy
+        enabled: true
+        state: started
+
+  handlers:
+    - name: Reload caddy
+      ansible.builtin.systemd_service:
+        name: caddy
+        state: reloaded
